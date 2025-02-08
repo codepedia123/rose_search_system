@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <script src="https://thunkable.github.io/webviewer-extension/thunkableWebviewerExtension.js" type="text/javascript"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dynamic Page with Thunkable Integration</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap');
+
+    /* Global Styles */
+    body {
+      font-family: 'Montserrat', sans-serif;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      background-color: #ffffff;
+      overflow: hidden;
+    }
+
+    /* Horizontally scrollable container for filters */
+    .filter-scroll-container {
+      width: 100%;
+      overflow-x: auto;
+      white-space: nowrap;
+      display: flex;
+      gap: 10px;
+      padding: 10px;
+      box-sizing: border-box;
+      background-color: #f7f7f7;
+    }
+
+    /* Filter Button Styles */
+    .filter-scroll-container button {
+      border: 1px solid black;   /* black outline */
+      padding: 8px 14px;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: normal;       /* normal font weight */
+      cursor: pointer;
+      background-color: white;   /* white background */
+      color: black;              /* black text */
+      white-space: nowrap;
+    }
+
+    .filter-scroll-container button:hover {
+      background-color: #eaeaea;
+    }
+
+    .slider {
+      width: 100%;
+      height: 100vh;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .slides {
+      overflow-y: scroll;
+      /* Adjust height so it doesn't overlap with filter bar (50-60px) */
+      height: calc(100% - 60px);
+      padding: 20px 10px;
+      box-sizing: border-box;
+    }
+
+    .slide {
+      width: calc(100% - 20px);
+      padding: 20px;
+      text-align: left;
+      box-sizing: border-box;
+      border-radius: 30px;
+      margin: 20px 10px;
+      cursor: pointer;
+    }
+
+    /* Example background colors for multiple slides */
+    .slide:nth-child(1) { background-color: #FFF8E7; }
+    .slide:nth-child(2) { background-color: #E6F7FF; }
+    .slide:nth-child(3) { background-color: #E6FFE6; }
+    .slide:nth-child(4) { background-color: #F5E6FF; }
+    .slide:nth-child(5) { background-color: #FFE6E6; }
+    .slide:nth-child(6) { background-color: #FFEFD5; }
+    .slide:nth-child(7) { background-color: #FFFFE0; }
+    .slide:nth-child(8) { background-color: #E0FFFF; }
+    .slide:nth-child(9) { background-color: #F0E68C; }
+
+    .slide h2 {
+      font-size: 16px;
+      font-weight: 600;
+      margin: 0 0 5px;
+    }
+
+    .slide p {
+      font-size: 12px;
+      font-weight: 400;
+      margin: 5px 0;
+      display: flex;
+      align-items: center;
+    }
+
+    .slide .icon {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      margin-right: 10px;
+      vertical-align: middle;
+      background-size: cover;
+    }
+
+    .icon-location {
+      background-image: url('https://res.cloudinary.com/di751ehfz/image/upload/v1722218141/mp-removebg-preview_ikwqdz.png');
+    }
+    .icon-clock {
+      background-image: url('https://res.cloudinary.com/di751ehfz/image/upload/v1722218138/circ-removebg-preview_jlvmsy.png');
+    }
+    .icon-dyslexia {
+      background-image: url('https://res.cloudinary.com/di751ehfz/image/upload/v1722218136/puzle-removebg-preview_oguelc.png');
+    }
+
+    .slide .price {
+      display: inline-block;
+      padding: 8px 16px;
+      background-color: #ff9999;
+      border-radius: 100px;
+      font-weight: 600;
+      color: #000;
+      font-size: 14px;
+      margin-top: 10px;
+    }
+
+    .popup-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .popup {
+      background: #fff;
+      border-radius: 20px;
+      padding: 20px;
+      width: 300px;
+      box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.2);
+      position: relative;
+      text-align: left;
+    }
+
+    .popup h2 {
+      font-size: 18px;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+
+    .popup p {
+      margin: 5px 0;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+    }
+
+    .popup .icon {
+      width: 16px;
+      height: 16px;
+      margin-right: 10px;
+      vertical-align: middle;
+      background-size: cover;
+    }
+
+    .popup .price-tag {
+      display: inline-block;
+      padding: 5px 10px;
+      background-color: #ff9999;
+      border-radius: 15px;
+      color: #fff;
+      font-weight: bold;
+      margin-top: 10px;
+      font-size: 14px;
+    }
+
+    .popup .close-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: bold;
+      color: #333;
+    }
+
+    /* Button styles for the popup */
+    .popup .button {
+      padding: 8px 16px;
+      border-radius: 20px;
+      margin: 10px 5px 0;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      text-decoration: none;
+      color: #fff;
+      text-align: center;
+      display: inline-block;
+    }
+
+    .view-org {
+      background-color: #7A68EB;
+    }
+
+    .view-website {
+      background-color: #33CF90;
+    }
+  </style>
+</head>
+<body>
+
+<!-- FILTER BUTTONS (Horizontally scrollable) -->
+<div class="filter-scroll-container">
+  <button onclick="filterPriceHighToLow()">Price: Highest to Lowest</button>
+  <button onclick="filterPriceLowToHigh()">Price: Lowest to Highest</button>
+  <button onclick="filterDateSoonest()">Date: Soonest</button>
+  <button onclick="filterDateFurthest()">Date: Furthest</button>
+</div>
+
+<div class="slider">
+  <div class="slides" id="slides">
+    <!-- Translated slides will be dynamically added here by JavaScript -->
+  </div>
+</div>
+
+<div class="popup-overlay" id="popupOverlay">
+  <div class="popup" id="popup">
+    <span class="close-btn" onclick="closePopup()">×</span>
+    <h2 id="popupTitle">Workshop Title</h2>
+    <p><a href="#" id="popupOrganization">Organization Name</a></p>
+    <p><span class="icon icon-dyslexia"></span><span id="popupTopic">SEN NAME</span></p>
+    <p><span class="icon icon-clock"></span><span id="popupTime">Date & Time</span></p>
+    <p><span class="icon icon-location"></span><span id="popupLocation">Location</span></p>
+    <div class="price-tag" id="popupPrice">$200</div>
+    <!-- Added Buttons -->
+    <a href="#" class="button view-org" onclick="postMessage('View Organisation')">View Organisation</a>
+    <a href="#" class="button view-website" onclick="postMessage('View Website')">View Website</a>
+  </div>
+</div>
+
+<script>
+  const slidesContainer = document.getElementById('slides');
+  let targetLang = 'en';       // Default language
+  let slideData = [];          // Original data for reference
+  let translatedData = [];     // Translated data for display
+
+  // ---------------------- Utilities ---------------------- //
+  // Parse date in format DD/MM/YYYY to a Date object for sorting
+  function parseDDMMYYYY(dateStr) {
+    if (!dateStr || typeof dateStr !== 'string') {
+      return new Date('1970-01-01'); // fallback
+    }
+    const [day, month, year] = dateStr.split('/');
+    return new Date(`${year}-${month}-${day}`);
+  }
+
+  // Convert "DD/MM/YYYY" + "Time" into "13 January 2025 10:00 AM - 11:00 AM"
+  function formatDateTime(dateStrDDMMYYYY, timeStr) {
+    if (!dateStrDDMMYYYY) return timeStr; // fallback if date is missing
+    const [day, month, year] = dateStrDDMMYYYY.split('/');
+    const dayNum = Number(day);
+    const monthNum = Number(month);
+    const yearNum = Number(year);
+
+    const monthNames = [
+      "January","February","March","April","May","June",
+      "July","August","September","October","November","December"
+    ];
+    const monthName = monthNames[monthNum - 1] || "Unknown";
+
+    // Final format => "13 January 2025 10:00 AM - 11:00 AM"
+    return `${dayNum} ${monthName} ${yearNum} ${timeStr}`;
+  }
+  // ------------------------------------------------------- //
+
+  // Use the same translation approach as your second code snippet:
+  // Return lines of text, then split by newline.
+  const translationAPIUrl = "https://script.google.com/macros/s/AKfycbyOjmRSRhbTQ4HEHnR5yAb5eoNQJn2t80yvmdX03uYZzqUXqCPnZ0AjTaAEgNcleyBM/exec";
+
+  // Translate or update slides
+  function translateSlides(data) {
+    slideData = data; // Keep original
+    if (data.length === 0) {
+      slidesContainer.innerHTML = "<p style='color: grey; font-size: 14px; text-align: center;'>No Recommendations</p>";
+      return;
+    }
+
+    // If no valid target language, skip
+    if (!targetLang || targetLang.trim() === '') {
+      console.error("Target language is missing or invalid.");
+      return;
+    }
+
+    // If language is English, skip the API call
+    if (targetLang === 'en') {
+      translatedData = data.map(item => ({ ...item })); // just clone
+      updateSlidesContent(translatedData, slideData);
+    } else {
+      // Prepare a pipe-delimited line for each workshop
+      // so the script can return them line by line.
+      const csvData = data.map(item =>
+        `${item.title}|${item.organization}|${item.topic}|${item.time}|${item.location}|${item.price}`
+      ).join("\n");
+
+      // Example final URL: ?text=...&source=en&target=xx
+      const url =
+        `${translationAPIUrl}?text=${encodeURIComponent(csvData)}&source=en&target=${encodeURIComponent(targetLang)}`;
+
+      fetch(url)
+        .then(response => response.text())
+        .then(translatedText => {
+          // Split the entire response by newlines
+          const rows = translatedText.split("\n");
+
+          // Build an array of translated objects
+          translatedData = rows.map(line => {
+            const [title, organization, topic, time, location, price] = line.split("|");
+            return {
+              title: title || "",
+              organization: organization || "",
+              topic: topic || "",
+              time: time || "",
+              location: location || "",
+              price: price || ""
+            };
+          });
+
+          // Then update the slides
+          updateSlidesContent(translatedData, slideData);
+        })
+        .catch(error => {
+          console.error("Translation API Error:", error);
+        });
+    }
+  }
+
+  // Update slides content after translation
+  function updateSlidesContent(tData, oData) {
+    slidesContainer.innerHTML = ""; // Clear existing slides
+
+    tData.forEach((item, index) => {
+      const slide = document.createElement("div");
+      slide.className = "slide";
+
+      // Merge original date with translated time
+      const dateTimeStr = formatDateTime(oData[index].Date, item.time);
+
+      slide.onclick = () => {
+        // Post the original ID to Thunkable
+        ThunkableWebviewerExtension.postMessage(String(oData[index].id));
+        showPopup(item, oData[index].Date);
+      };
+
+      slide.innerHTML = `
+        <h2>${item.title}</h2>
+        <p><span style="color: #3498db;"><strong>${item.organization}</strong></span></p>
+        <p><span class="icon icon-dyslexia"></span>${item.topic}</p>
+        <!-- Merged date/time -->
+        <p><span class="icon icon-clock"></span>${dateTimeStr}</p>
+        <p><span class="icon icon-location"></span>${item.location}</p>
+        <div class="price">${item.price}</div>
+      `;
+      slidesContainer.appendChild(slide);
+    });
+  }
+
+  // Popup management
+  function showPopup(data, dateStr) {
+    document.getElementById("popupTitle").innerText = data.title;
+    document.getElementById("popupOrganization").innerText = data.organization;
+    document.getElementById("popupTopic").innerText = data.topic;
+    document.getElementById("popupTime").innerText = formatDateTime(dateStr, data.time);
+    document.getElementById("popupLocation").innerText = data.location;
+    document.getElementById("popupPrice").innerText = data.price;
+    document.getElementById("popupOverlay").style.display = "flex";
+  }
+
+  function closePopup() {
+    document.getElementById("popupOverlay").style.display = "none";
+  }
+
+  // Post a message back to Thunkable
+  function postMessage(mess) {
+    ThunkableWebviewerExtension.postMessage(mess);
+  }
+
+  // -------------------- FILTERING LOGIC -------------------- //
+
+  function filterPriceHighToLow() {
+    const combined = slideData.map((orig, i) => ({
+      original: orig,
+      translated: translatedData[i]
+    }));
+    combined.sort((a, b) => b.original.price - a.original.price);
+
+    slideData = combined.map(item => item.original);
+    translatedData = combined.map(item => item.translated);
+    updateSlidesContent(translatedData, slideData);
+  }
+
+  function filterPriceLowToHigh() {
+    const combined = slideData.map((orig, i) => ({
+      original: orig,
+      translated: translatedData[i]
+    }));
+    combined.sort((a, b) => a.original.price - b.original.price);
+
+    slideData = combined.map(item => item.original);
+    translatedData = combined.map(item => item.translated);
+    updateSlidesContent(translatedData, slideData);
+  }
+
+  function filterDateSoonest() {
+    const combined = slideData.map((orig, i) => ({ original: orig, translated: translatedData[i] }));
+    combined.sort((a, b) => parseDDMMYYYY(a.original.Date) - parseDDMMYYYY(b.original.Date));
+
+    slideData = combined.map(item => item.original);
+    translatedData = combined.map(item => item.translated);
+    updateSlidesContent(translatedData, slideData);
+  }
+
+  function filterDateFurthest() {
+    const combined = slideData.map((orig, i) => ({ original: orig, translated: translatedData[i] }));
+    combined.sort((a, b) => parseDDMMYYYY(b.original.Date) - parseDDMMYYYY(a.original.Date));
+
+    slideData = combined.map(item => item.original);
+    translatedData = combined.map(item => item.translated);
+    updateSlidesContent(translatedData, slideData);
+  }
+
+  // -------------------------------------------------------- //
+
+  /**
+   * Accepts JSON in the format:
+   * {
+   *   "data": [
+   *     {
+   *       "Name": "Alpha Corp",
+   *       "OrgID": 1,
+   *       "SEN": "ASD, ADHD, Dyslexia",
+   *       "Time": "10:00 AM - 11:00 AM",
+   *       "Location": "Island",
+   *       "Price": 3653,
+   *       "Date": "13/01/2025",
+   *       "ID": 1,
+   *       "organization": "zdfgh",
+   *       "workshopID": "worksop12J134"
+   *     }
+   *   ]
+   * }
+   */
+  function updateSlidesFromJSON(jsonData) {
+    const dataObj = typeof jsonData === 'string' ? JSON.parse(jsonData) : jsonData;
+
+    if (!dataObj || !Array.isArray(dataObj.data)) {
+      console.error("Invalid JSON format: Expected { data: [...] }");
+      return;
+    }
+
+    // Map the incoming objects to the structure our code expects
+    const data = dataObj.data.map(item => ({
+      id: item.ID,
+      title: String(item.Name),
+      organization: String(item.organization || `Org #${item.OrgID}`),
+      topic: item.SEN,
+      time: item.Time,
+      location: item.Location,
+      price: Number(item.Price),
+      Date: item.Date || ""
+    }));
+
+    translateSlides(data);
+  }
+
+  // Listen for messages from Thunkable
+  ThunkableWebviewerExtension.receiveMessage(function(message) {
+    console.log("Received message:", message);
+    try {
+      if (message.startsWith("*")) {
+        // Language change command; e.g., "*es" => Spanish
+        targetLang = message.slice(1);
+        console.log("Language changed to:", targetLang);
+      } else {
+        // Otherwise, assume the message is our JSON data
+        updateSlidesFromJSON(message);
+      }
+    } catch (error) {
+      console.error("Error processing received message:", error);
+    }
+  });
+
+  /**
+   * (Optional) Example local test:
+   * const exampleJSON = {
+   *   "data": [
+   *     {
+   *       "Name": "Alpha Corp",
+   *       "OrgID": 1,
+   *       "SEN": "ASD, ADHD, Dyslexia",
+   *       "Time": "10:00 AM - 11:00 AM",
+   *       "Location": "Island",
+   *       "Price": 3653,
+   *       "Date": "13/01/2025",
+   *       "ID": 1,
+   *       "organization": "zdfgh",
+   *       "workshopID": "worksop12J134"
+   *     }
+   *   ]
+   * };
+   * updateSlidesFromJSON(exampleJSON);
+   */
+</script>
+
+<!-- Optional CF beacon script; can be removed if not needed -->
+<script
+  defer
+  src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015"
+  integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ=="
+  data-cf-beacon='{"rayId":"8f4bef66ca9659e4","serverTiming":{"name":{"cfExtPri":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2024.10.5","token":"ef0548ffc9904e66b75bcd9134981ca0"}'
+  crossorigin="anonymous">
+</script>
+
+</body>
+</html>
