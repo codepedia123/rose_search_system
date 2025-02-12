@@ -33,25 +33,29 @@
       background-color: #f7f7f7;
     }
 
-    /* Filter Button Styles (default) */
+    /* Filter Button Styles */
     .filter-scroll-container button {
-      border: 1px solid black;
+      border: 1px solid black;   /* black outline by default */
       padding: 8px 14px;
       border-radius: 20px;
       font-size: 14px;
       font-weight: normal;
       cursor: pointer;
-      background-color: white;
-      color: black;
+      background-color: white;   /* white background by default */
+      color: black;              /* black text */
       white-space: nowrap;
-      outline: none;
+      transition: background-color 0.3s, border 0.3s;
     }
-
     .filter-scroll-container button:hover {
       background-color: #eaeaea;
     }
 
-    /* Slider & Slides */
+    /* Active filter style: no border & light gray background */
+    .filter-scroll-container button.active {
+      border: none;
+      background-color: #d3d3d3;
+    }
+
     .slider {
       width: 100%;
       height: 100vh;
@@ -61,6 +65,7 @@
 
     .slides {
       overflow-y: scroll;
+      /* Adjust height so it doesn't overlap with filter bar (50-60px) */
       height: calc(100% - 60px);
       padding: 20px 10px;
       box-sizing: border-box;
@@ -131,7 +136,6 @@
       margin-top: 10px;
     }
 
-    /* Popup Overlay & Popup */
     .popup-overlay {
       position: fixed;
       top: 0;
@@ -186,6 +190,7 @@
       font-size: 14px;
     }
 
+    /* Description in popup only */
     .popup p.description {
       font-size: 12px;
       font-weight: 300;
@@ -205,7 +210,7 @@
       color: #333;
     }
 
-    /* Star (Save) Button */
+    /* Star button (save) */
     .star-button {
       position: absolute;
       top: 12px; 
@@ -215,7 +220,7 @@
       cursor: pointer;
     }
 
-    /* Popup Buttons */
+    /* Button styles for the popup */
     .popup .button {
       padding: 8px 16px;
       border-radius: 20px;
@@ -232,14 +237,9 @@
     .view-org {
       background-color: #7A68EB;
     }
+
     .view-website {
       background-color: #33CF90;
-    }
-
-    /* Active filter style (remove border, light gray background) */
-    .filter-active {
-      background-color: #d3d3d3 !important;
-      border: none !important;
     }
   </style>
 </head>
@@ -247,11 +247,12 @@
 
 <!-- FILTER BUTTONS (Horizontally scrollable) -->
 <div class="filter-scroll-container">
-  <!-- Each button has an ID so we can update styles dynamically -->
-  <button id="btnPriceHigh" onclick="toggleFilter('priceHighToLow')">Price: Highest to Lowest</button>
-  <button id="btnPriceLow" onclick="toggleFilter('priceLowToHigh')">Price: Lowest to Highest</button>
-  <button id="btnDateSoonest" onclick="toggleFilter('dateSoonest')">Date: Soonest</button>
-  <button id="btnDateFurthest" onclick="toggleFilter('dateFurthest')">Date: Furthest</button>
+  <!-- Price filters are mutually exclusive -->
+  <button id="btnPriceHigh" onclick="toggleFilter('priceHighToLow','btnPriceHigh','price')">Price: Highest to Lowest</button>
+  <button id="btnPriceLow" onclick="toggleFilter('priceLowToHigh','btnPriceLow','price')">Price: Lowest to Highest</button>
+  <!-- Date filters are mutually exclusive -->
+  <button id="btnDateSoonest" onclick="toggleFilter('dateSoonest','btnDateSoonest','date')">Date: Soonest</button>
+  <button id="btnDateFurthest" onclick="toggleFilter('dateFurthest','btnDateFurthest','date')">Date: Furthest</button>
 </div>
 
 <div class="slider">
@@ -289,14 +290,6 @@
 </div>
 
 <script>
-  // References to filter buttons for easy style updating
-  const filterButtons = {
-    priceHighToLow: document.getElementById("btnPriceHigh"),
-    priceLowToHigh: document.getElementById("btnPriceLow"),
-    dateSoonest: document.getElementById("btnDateSoonest"),
-    dateFurthest: document.getElementById("btnDateFurthest")
-  };
-
   const slidesContainer = document.getElementById('slides');
   let targetLang = 'en';               // Default language
   let slideDataOriginal = [];          // Original data (unfiltered)
@@ -304,7 +297,8 @@
   let slideData = [];                  // Currently displayed data after filters
   let translatedData = [];             // Parallel array for displayed translations
 
-  let activeFilters = [];              // Track active filter names
+  // We track filter states by storing the active filter names
+  let activeFilters = [];              // e.g. ["priceHighToLow","dateSoonest"]
   let savedIDs = [];                   // IDs that are currently saved
   let currentPopupID = null;           // The ID of the workshop in the popup
 
@@ -400,6 +394,8 @@
     }));
 
     // Apply each filter in the order they are active
+    // (Note: these are effectively "sorts," so the final sort
+    // in activeFilters may dominate, but that's the requested logic.)
     activeFilters.forEach(filter => {
       if (filter === 'priceHighToLow') {
         combined.sort((a, b) => b.original.price - a.original.price);
@@ -420,32 +416,52 @@
     updateSlidesContent(translatedData, slideData);
   }
 
-  // Toggle filter in activeFilters and update UI + slides
-  function toggleFilter(filterName) {
-    if (activeFilters.includes(filterName)) {
-      // Remove if already present
-      activeFilters = activeFilters.filter(f => f !== filterName);
-    } else {
-      // Add if not present
-      activeFilters.push(filterName);
+  /**
+   * Toggle a filter in or out of the active list
+   * 
+   * @param {string} filterName - e.g. "priceHighToLow"
+   * @param {string} btnId - the button's HTML ID (e.g. "btnPriceHigh")
+   * @param {string} category - e.g. "price" or "date"
+   */
+  function toggleFilter(filterName, btnId, category) {
+    // 1) Remove the "opposite" filter if it exists
+    // Price pair: priceHighToLow vs priceLowToHigh
+    // Date pair: dateSoonest vs dateFurthest
+    if (category === 'price') {
+      if (filterName === 'priceHighToLow') {
+        // Remove priceLowToHigh if present
+        activeFilters = activeFilters.filter(f => f !== 'priceLowToHigh');
+        document.getElementById("btnPriceLow").classList.remove("active");
+      } else if (filterName === 'priceLowToHigh') {
+        // Remove priceHighToLow if present
+        activeFilters = activeFilters.filter(f => f !== 'priceHighToLow');
+        document.getElementById("btnPriceHigh").classList.remove("active");
+      }
+    } else if (category === 'date') {
+      if (filterName === 'dateSoonest') {
+        // Remove dateFurthest if present
+        activeFilters = activeFilters.filter(f => f !== 'dateFurthest');
+        document.getElementById("btnDateFurthest").classList.remove("active");
+      } else if (filterName === 'dateFurthest') {
+        // Remove dateSoonest if present
+        activeFilters = activeFilters.filter(f => f !== 'dateSoonest');
+        document.getElementById("btnDateSoonest").classList.remove("active");
+      }
     }
 
-    // Update button style
-    updateFilterButtonStyles();
-    // Re-apply filters
-    applyAllFilters();
-  }
+    // 2) Now toggle the requested filter
+    if (activeFilters.includes(filterName)) {
+      // Remove it
+      activeFilters = activeFilters.filter(f => f !== filterName);
+      document.getElementById(btnId).classList.remove("active");
+    } else {
+      // Add it
+      activeFilters.push(filterName);
+      document.getElementById(btnId).classList.add("active");
+    }
 
-  // Update button styles based on activeFilters
-  function updateFilterButtonStyles() {
-    // For each known filter, check if it's active
-    Object.entries(filterButtons).forEach(([filterKey, button]) => {
-      if (activeFilters.includes(filterKey)) {
-        button.classList.add('filter-active');
-      } else {
-        button.classList.remove('filter-active');
-      }
-    });
+    // 3) Re-apply all filters
+    applyAllFilters();
   }
 
   // ---------------------- Slide & Popup Rendering ---------------------- //
@@ -459,7 +475,7 @@
       const dateTimeStr = formatDateTime(oData[index].Date, item.time);
 
       slide.onclick = () => {
-        // Show popup
+        // Show popup for this workshop
         showPopup(item, oData[index].Date, oData[index].id);
       };
 
@@ -500,30 +516,32 @@
   function updateStarIcon() {
     const starImg = document.getElementById("starButton");
     if (!currentPopupID) return;
+
+    // If ID is saved => use filled star
     if (savedIDs.includes(String(currentPopupID))) {
-      // Saved
       starImg.src = "https://res.cloudinary.com/di751ehfz/image/upload/v1739370280/star_1_ndcskw.png";
     } else {
-      // Unsaved
+      // Otherwise => empty star
       starImg.src = "https://res.cloudinary.com/di751ehfz/image/upload/v1739370280/star_bxmhkq.png";
     }
   }
 
+  // If star is clicked => toggle saved
   function toggleSaved() {
     if (!currentPopupID) return;
     const strID = String(currentPopupID);
 
-    // If already saved, remove it
     if (savedIDs.includes(strID)) {
+      // If already saved => remove it
       savedIDs = savedIDs.filter(id => id !== strID);
     } else {
-      // Otherwise, add it
+      // If unsaved => add it
       savedIDs.push(strID);
     }
-    // Update icon immediately
+    // Update icon
     updateStarIcon();
 
-    // Send updated saved IDs list to Thunkable (prefix "?")
+    // Send updated saved IDs list to Thunkable
     postMessage("?" + savedIDs.join(","));
   }
 
@@ -532,6 +550,24 @@
     ThunkableWebviewerExtension.postMessage(mess);
   }
 
+  /**
+   * Expects JSON in the format:
+   * {
+   *   "data": [
+   *     {
+   *       "ID": 1,
+   *       "Name": "Workshop Title",
+   *       "organization": "Some Org",
+   *       "SEN": "Dyslexia",
+   *       "Time": "10:00 AM - 11:00 AM",
+   *       "Location": "City",
+   *       "Price": 300,
+   *       "Date": "15/02/2025",
+   *       "Description": "Details..."
+   *     }
+   *   ]
+   * }
+   */
   function updateSlidesFromJSON(jsonData) {
     const dataObj = (typeof jsonData === 'string') ? JSON.parse(jsonData) : jsonData;
     if (!dataObj || !Array.isArray(dataObj.data)) {
@@ -539,7 +575,7 @@
       return;
     }
 
-    // Map input to consistent shape
+    // Map input to consistent structure
     const data = dataObj.data.map(item => ({
       id: item.ID,
       title: String(item.Name),
@@ -585,7 +621,7 @@
   });
 </script>
 
-<!-- Optional: remove if not needed -->
+<!-- Optional CF beacon script; can be removed if not needed -->
 <script
   defer
   src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015"
