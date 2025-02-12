@@ -100,16 +100,6 @@
       align-items: center;
     }
 
-    /* Description styling: smaller, lighter, 80% opacity */
-    .slide p.description {
-      font-size: 12px;
-      font-weight: 300;
-      opacity: 0.8;
-      color: #333;
-      margin: 3px 0 10px;  /* a bit more spacing at the bottom */
-      display: block;      /* no icon needed, so can be block */
-    }
-
     .slide .icon {
       display: inline-block;
       width: 16px;
@@ -175,16 +165,6 @@
       align-items: center;
     }
 
-    /* Description styling in popup (similarly smaller, lighter, 80% opacity) */
-    .popup p.description {
-      font-size: 12px;
-      font-weight: 300;
-      opacity: 0.8;
-      color: #333;
-      display: block;
-      margin-top: 5px;
-    }
-
     .popup .icon {
       width: 16px;
       height: 16px;
@@ -204,6 +184,16 @@
       font-size: 14px;
     }
 
+    /* Description in popup only */
+    .popup p.description {
+      font-size: 12px;
+      font-weight: 300;
+      opacity: 0.8;
+      color: #333;
+      display: block;
+      margin-top: 5px;
+    }
+
     .popup .close-btn {
       position: absolute;
       top: 10px;
@@ -212,6 +202,16 @@
       font-size: 16px;
       font-weight: bold;
       color: #333;
+    }
+
+    /* Star button (save) */
+    .star-button {
+      position: absolute;
+      top: 12px; 
+      right: 50px;
+      width: 20px;
+      height: 20px;
+      cursor: pointer;
     }
 
     /* Button styles for the popup */
@@ -241,10 +241,10 @@
 
 <!-- FILTER BUTTONS (Horizontally scrollable) -->
 <div class="filter-scroll-container">
-  <button onclick="filterPriceHighToLow()">Price: Highest to Lowest</button>
-  <button onclick="filterPriceLowToHigh()">Price: Lowest to Highest</button>
-  <button onclick="filterDateSoonest()">Date: Soonest</button>
-  <button onclick="filterDateFurthest()">Date: Furthest</button>
+  <button onclick="toggleFilter('priceHighToLow')">Price: Highest to Lowest</button>
+  <button onclick="toggleFilter('priceLowToHigh')">Price: Lowest to Highest</button>
+  <button onclick="toggleFilter('dateSoonest')">Date: Soonest</button>
+  <button onclick="toggleFilter('dateFurthest')">Date: Furthest</button>
 </div>
 
 <div class="slider">
@@ -255,17 +255,26 @@
 
 <div class="popup-overlay" id="popupOverlay">
   <div class="popup" id="popup">
+    <!-- Close button -->
     <span class="close-btn" onclick="closePopup()">×</span>
+    <!-- Star button (save) -->
+    <img 
+      id="starButton" 
+      class="star-button" 
+      src="https://res.cloudinary.com/di751ehfz/image/upload/v1739370280/star_bxmhkq.png"
+      onclick="toggleSaved()"
+    />
+
     <h2 id="popupTitle">Workshop Title</h2>
     <p><a href="#" id="popupOrganization">Organization Name</a></p>
     <p><span class="icon icon-dyslexia"></span><span id="popupTopic">SEN NAME</span></p>
     <p><span class="icon icon-clock"></span><span id="popupTime">Date & Time</span></p>
     <p><span class="icon icon-location"></span><span id="popupLocation">Location</span></p>
-    <!-- Description in popup -->
+    <!-- Description only in popup -->
     <p class="description" id="popupDescription"></p>
-    
+
     <div class="price-tag" id="popupPrice">$200</div>
-    <!-- Added Buttons -->
+    <!-- Extra Buttons for Popup -->
     <a href="#" class="button view-org" onclick="postMessage('View Organisation')">View Organisation</a>
     <a href="#" class="button view-website" onclick="postMessage('View Website')">View Website</a>
   </div>
@@ -273,9 +282,15 @@
 
 <script>
   const slidesContainer = document.getElementById('slides');
-  let targetLang = 'en';       // Default language
-  let slideData = [];          // Original data for reference
-  let translatedData = [];     // Translated data for display
+  let targetLang = 'en';               // Default language
+  let slideDataOriginal = [];          // Original data (unfiltered, untranslated)
+  let translatedDataOriginal = [];     // Translated data (parallel structure)
+  let slideData = [];                  // Currently displayed data (after filters)
+  let translatedData = [];             // Currently displayed translated data (after filters)
+
+  let activeFilters = [];              // Track active filters/sorts
+  let savedIDs = [];                   // Track saved workshop IDs
+  let currentPopupID = null;           // ID of the workshop currently shown in popup
 
   // ---------------------- Utilities ---------------------- //
   // Parse date in format DD/MM/YYYY to a Date object for sorting
@@ -309,9 +324,11 @@
   // Translation API
   const translationAPIUrl = "https://script.google.com/macros/s/AKfycbyOjmRSRhbTQ4HEHnR5yAb5eoNQJn2t80yvmdX03uYZzqUXqCPnZ0AjTaAEgNcleyBM/exec";
 
-  // Translate or update slides
+  // Translate (or skip translation) then store the result in translatedDataOriginal
   function translateSlides(data) {
-    slideData = data; // Keep original
+    // Keep the original data array
+    slideDataOriginal = data;
+
     if (data.length === 0) {
       slidesContainer.innerHTML = "<p style='color: grey; font-size: 14px; text-align: center;'>No Recommendations</p>";
       return;
@@ -325,27 +342,23 @@
 
     // If language is English, skip the API call
     if (targetLang === 'en') {
-      translatedData = data.map(item => ({ ...item })); // just clone
-      updateSlidesContent(translatedData, slideData);
+      // Just clone the data
+      translatedDataOriginal = data.map(item => ({ ...item }));
+      applyAllFilters();
     } else {
-      // Prepare a pipe-delimited line for each workshop
-      // so the script can return them line by line.
+      // Prepare a pipe-delimited line for each workshop so the script can return them line by line.
       const csvData = data.map(item =>
         `${item.title}|${item.organization}|${item.topic}|${item.time}|${item.location}|${item.price}|${item.description}`
       ).join("\n");
 
-      // Example final URL: ?text=...&source=en&target=xx
       const url =
         `${translationAPIUrl}?text=${encodeURIComponent(csvData)}&source=en&target=${encodeURIComponent(targetLang)}`;
 
       fetch(url)
         .then(response => response.text())
         .then(translatedText => {
-          // Split the entire response by newlines
           const rows = translatedText.split("\n");
-
-          // Build an array of translated objects
-          translatedData = rows.map(line => {
+          translatedDataOriginal = rows.map(line => {
             const [title, organization, topic, time, location, price, description] = line.split("|");
             return {
               title: title || "",
@@ -357,9 +370,7 @@
               description: description || ""
             };
           });
-
-          // Then update the slides
-          updateSlidesContent(translatedData, slideData);
+          applyAllFilters();
         })
         .catch(error => {
           console.error("Translation API Error:", error);
@@ -367,7 +378,46 @@
     }
   }
 
-  // Update slides content after translation
+  // Apply all active filters in sequence to produce the final displayed data
+  function applyAllFilters() {
+    // Start from the "original" data sets
+    let combined = slideDataOriginal.map((orig, i) => ({
+      original: orig,
+      translated: translatedDataOriginal[i]
+    }));
+
+    // Apply each "filter" (really a sort) in the order they were toggled on
+    activeFilters.forEach(filter => {
+      if (filter === 'priceHighToLow') {
+        combined.sort((a, b) => b.original.price - a.original.price);
+      } else if (filter === 'priceLowToHigh') {
+        combined.sort((a, b) => a.original.price - b.original.price);
+      } else if (filter === 'dateSoonest') {
+        combined.sort((a, b) => parseDDMMYYYY(a.original.Date) - parseDDMMYYYY(b.original.Date));
+      } else if (filter === 'dateFurthest') {
+        combined.sort((a, b) => parseDDMMYYYY(b.original.Date) - parseDDMMYYYY(a.original.Date));
+      }
+    });
+
+    slideData = combined.map(item => item.original);
+    translatedData = combined.map(item => item.translated);
+
+    updateSlidesContent(translatedData, slideData);
+  }
+
+  // Toggle a filter in/out of the activeFilters array
+  function toggleFilter(filterName) {
+    if (activeFilters.includes(filterName)) {
+      // Remove it if already applied
+      activeFilters = activeFilters.filter(f => f !== filterName);
+    } else {
+      // Add if not applied
+      activeFilters.push(filterName);
+    }
+    applyAllFilters();
+  }
+
+  // Update the slides on screen
   function updateSlidesContent(tData, oData) {
     slidesContainer.innerHTML = ""; // Clear existing slides
 
@@ -375,32 +425,30 @@
       const slide = document.createElement("div");
       slide.className = "slide";
 
-      // Merge original date with translated time
+      // Merge the original date with translated time
       const dateTimeStr = formatDateTime(oData[index].Date, item.time);
 
       slide.onclick = () => {
-        // Post the original ID to Thunkable
+        // Post the original ID to Thunkable for reference (optional)
         ThunkableWebviewerExtension.postMessage(String(oData[index].id));
-        showPopup(item, oData[index].Date);
+        showPopup(item, oData[index].Date, oData[index].id);
       };
 
       slide.innerHTML = `
         <h2>${item.title}</h2>
         <p><span style="color: #3498db;"><strong>${item.organization}</strong></span></p>
         <p><span class="icon icon-dyslexia"></span>${item.topic}</p>
-        <!-- Merged date/time -->
         <p><span class="icon icon-clock"></span>${dateTimeStr}</p>
         <p><span class="icon icon-location"></span>${item.location}</p>
-        <!-- Description -->
-        <p class="description">${item.description}</p>
         <div class="price">${item.price}</div>
       `;
       slidesContainer.appendChild(slide);
     });
   }
 
-  // Popup management
-  function showPopup(data, dateStr) {
+  // Show the popup with full detail
+  function showPopup(data, dateStr, idValue) {
+    currentPopupID = idValue; // store the ID of the displayed workshop
     document.getElementById("popupTitle").innerText = data.title;
     document.getElementById("popupOrganization").innerText = data.organization;
     document.getElementById("popupTopic").innerText = data.topic;
@@ -408,62 +456,46 @@
     document.getElementById("popupLocation").innerText = data.location;
     document.getElementById("popupPrice").innerText = data.price;
     document.getElementById("popupDescription").innerText = data.description;
+
+    // Update star icon according to whether it's saved
+    updateStarIcon();
+
     document.getElementById("popupOverlay").style.display = "flex";
   }
 
   function closePopup() {
     document.getElementById("popupOverlay").style.display = "none";
+    currentPopupID = null;
   }
 
-  // Post a message back to Thunkable
+  // Send a message back to Thunkable (generic helper)
   function postMessage(mess) {
     ThunkableWebviewerExtension.postMessage(mess);
   }
 
-  // -------------------- FILTERING LOGIC -------------------- //
-  function filterPriceHighToLow() {
-    const combined = slideData.map((orig, i) => ({
-      original: orig,
-      translated: translatedData[i]
-    }));
-    combined.sort((a, b) => b.original.price - a.original.price);
-
-    slideData = combined.map(item => item.original);
-    translatedData = combined.map(item => item.translated);
-    updateSlidesContent(translatedData, slideData);
+  // Star/save functionality
+  function toggleSaved() {
+    // If current workshop is already saved, do nothing (per your requirement)
+    if (savedIDs.includes(String(currentPopupID))) {
+      return;
+    }
+    // If unsaved, send ? + workshop ID to Thunkable
+    postMessage(`?${currentPopupID}`);
   }
 
-  function filterPriceLowToHigh() {
-    const combined = slideData.map((orig, i) => ({
-      original: orig,
-      translated: translatedData[i]
-    }));
-    combined.sort((a, b) => a.original.price - b.original.price);
-
-    slideData = combined.map(item => item.original);
-    translatedData = combined.map(item => item.translated);
-    updateSlidesContent(translatedData, slideData);
+  function updateStarIcon() {
+    const starImg = document.getElementById("starButton");
+    if (!currentPopupID) return;
+    if (savedIDs.includes(String(currentPopupID))) {
+      // Show saved icon
+      starImg.src = "https://res.cloudinary.com/di751ehfz/image/upload/v1739370280/star_1_ndcskw.png";
+    } else {
+      // Show unsaved icon
+      starImg.src = "https://res.cloudinary.com/di751ehfz/image/upload/v1739370280/star_bxmhkq.png";
+    }
   }
 
-  function filterDateSoonest() {
-    const combined = slideData.map((orig, i) => ({ original: orig, translated: translatedData[i] }));
-    combined.sort((a, b) => parseDDMMYYYY(a.original.Date) - parseDDMMYYYY(b.original.Date));
-
-    slideData = combined.map(item => item.original);
-    translatedData = combined.map(item => item.translated);
-    updateSlidesContent(translatedData, slideData);
-  }
-
-  function filterDateFurthest() {
-    const combined = slideData.map((orig, i) => ({ original: orig, translated: translatedData[i] }));
-    combined.sort((a, b) => parseDDMMYYYY(b.original.Date) - parseDDMMYYYY(a.original.Date));
-
-    slideData = combined.map(item => item.original);
-    translatedData = combined.map(item => item.translated);
-    updateSlidesContent(translatedData, slideData);
-  }
-
-  // -------------------------------------------------------- //
+  // -------------------- THUNKABLE INTEGRATION -------------------- //
 
   /**
    * Accepts JSON in the format:
@@ -480,7 +512,7 @@
    *       "ID": 1,
    *       "organization": "zdfgh",
    *       "workshopID": "worksop12J134",
-   *       "Description": "This is a sample description for the workshop."
+   *       "Description": "Workshop details here..."
    *     }
    *   ]
    * }
@@ -506,47 +538,39 @@
       description: item.Description ? String(item.Description) : ""
     }));
 
+    // Pass data to the translation process
     translateSlides(data);
   }
 
-  // Listen for messages from Thunkable
+  // Receive messages from Thunkable
   ThunkableWebviewerExtension.receiveMessage(function(message) {
     console.log("Received message:", message);
     try {
+      // If message starts with "*" => language change
       if (message.startsWith("*")) {
-        // Language change command; e.g., "*es" => Spanish
         targetLang = message.slice(1);
         console.log("Language changed to:", targetLang);
-      } else {
-        // Otherwise, assume the message is our JSON data
+        // Re-run translation if we already have data
+        if (slideDataOriginal && slideDataOriginal.length > 0) {
+          translateSlides(slideDataOriginal);
+        }
+      }
+      // If message starts with "?" => updated list of saved IDs
+      else if (message.startsWith("?")) {
+        // The remainder is a comma-separated list of saved IDs
+        const savedStr = message.substring(1).trim();
+        savedIDs = savedStr ? savedStr.split(",") : [];
+        // Update star if popup is open
+        updateStarIcon();
+      }
+      // Otherwise, treat the message as our JSON data
+      else {
         updateSlidesFromJSON(message);
       }
     } catch (error) {
       console.error("Error processing received message:", error);
     }
   });
-
-  /**
-   * (Optional) Example local test:
-   * const exampleJSON = {
-   *   "data": [
-   *     {
-   *       "Name": "Alpha Corp",
-   *       "OrgID": 1,
-   *       "SEN": "ASD, ADHD, Dyslexia",
-   *       "Time": "10:00 AM - 11:00 AM",
-   *       "Location": "Island",
-   *       "Price": 3653,
-   *       "Date": "13/01/2025",
-   *       "ID": 1,
-   *       "organization": "zdfgh",
-   *       "workshopID": "worksop12J134",
-   *       "Description": "This is a sample description for the workshop."
-   *     }
-   *   ]
-   * };
-   * updateSlidesFromJSON(exampleJSON);
-   */
 </script>
 
 <!-- Optional CF beacon script; can be removed if not needed -->
