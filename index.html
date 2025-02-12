@@ -100,6 +100,16 @@
       align-items: center;
     }
 
+    /* Description styling: smaller, lighter, 80% opacity */
+    .slide p.description {
+      font-size: 12px;
+      font-weight: 300;
+      opacity: 0.8;
+      color: #333;
+      margin: 3px 0 10px;  /* a bit more spacing at the bottom */
+      display: block;      /* no icon needed, so can be block */
+    }
+
     .slide .icon {
       display: inline-block;
       width: 16px;
@@ -163,6 +173,16 @@
       font-size: 14px;
       display: flex;
       align-items: center;
+    }
+
+    /* Description styling in popup (similarly smaller, lighter, 80% opacity) */
+    .popup p.description {
+      font-size: 12px;
+      font-weight: 300;
+      opacity: 0.8;
+      color: #333;
+      display: block;
+      margin-top: 5px;
     }
 
     .popup .icon {
@@ -241,6 +261,9 @@
     <p><span class="icon icon-dyslexia"></span><span id="popupTopic">SEN NAME</span></p>
     <p><span class="icon icon-clock"></span><span id="popupTime">Date & Time</span></p>
     <p><span class="icon icon-location"></span><span id="popupLocation">Location</span></p>
+    <!-- Description in popup -->
+    <p class="description" id="popupDescription"></p>
+    
     <div class="price-tag" id="popupPrice">$200</div>
     <!-- Added Buttons -->
     <a href="#" class="button view-org" onclick="postMessage('View Organisation')">View Organisation</a>
@@ -283,8 +306,7 @@
   }
   // ------------------------------------------------------- //
 
-  // Use the same translation approach as your second code snippet:
-  // Return lines of text, then split by newline.
+  // Translation API
   const translationAPIUrl = "https://script.google.com/macros/s/AKfycbyOjmRSRhbTQ4HEHnR5yAb5eoNQJn2t80yvmdX03uYZzqUXqCPnZ0AjTaAEgNcleyBM/exec";
 
   // Translate or update slides
@@ -309,7 +331,7 @@
       // Prepare a pipe-delimited line for each workshop
       // so the script can return them line by line.
       const csvData = data.map(item =>
-        `${item.title}|${item.organization}|${item.topic}|${item.time}|${item.location}|${item.price}`
+        `${item.title}|${item.organization}|${item.topic}|${item.time}|${item.location}|${item.price}|${item.description}`
       ).join("\n");
 
       // Example final URL: ?text=...&source=en&target=xx
@@ -324,14 +346,15 @@
 
           // Build an array of translated objects
           translatedData = rows.map(line => {
-            const [title, organization, topic, time, location, price] = line.split("|");
+            const [title, organization, topic, time, location, price, description] = line.split("|");
             return {
               title: title || "",
               organization: organization || "",
               topic: topic || "",
               time: time || "",
               location: location || "",
-              price: price || ""
+              price: price || "",
+              description: description || ""
             };
           });
 
@@ -368,6 +391,8 @@
         <!-- Merged date/time -->
         <p><span class="icon icon-clock"></span>${dateTimeStr}</p>
         <p><span class="icon icon-location"></span>${item.location}</p>
+        <!-- Description -->
+        <p class="description">${item.description}</p>
         <div class="price">${item.price}</div>
       `;
       slidesContainer.appendChild(slide);
@@ -382,6 +407,7 @@
     document.getElementById("popupTime").innerText = formatDateTime(dateStr, data.time);
     document.getElementById("popupLocation").innerText = data.location;
     document.getElementById("popupPrice").innerText = data.price;
+    document.getElementById("popupDescription").innerText = data.description;
     document.getElementById("popupOverlay").style.display = "flex";
   }
 
@@ -395,7 +421,6 @@
   }
 
   // -------------------- FILTERING LOGIC -------------------- //
-
   function filterPriceHighToLow() {
     const combined = slideData.map((orig, i) => ({
       original: orig,
@@ -454,7 +479,8 @@
    *       "Date": "13/01/2025",
    *       "ID": 1,
    *       "organization": "zdfgh",
-   *       "workshopID": "worksop12J134"
+   *       "workshopID": "worksop12J134",
+   *       "Description": "This is a sample description for the workshop."
    *     }
    *   ]
    * }
@@ -476,7 +502,8 @@
       time: item.Time,
       location: item.Location,
       price: Number(item.Price),
-      Date: item.Date || ""
+      Date: item.Date || "",
+      description: item.Description ? String(item.Description) : ""
     }));
 
     translateSlides(data);
@@ -513,7 +540,8 @@
    *       "Date": "13/01/2025",
    *       "ID": 1,
    *       "organization": "zdfgh",
-   *       "workshopID": "worksop12J134"
+   *       "workshopID": "worksop12J134",
+   *       "Description": "This is a sample description for the workshop."
    *     }
    *   ]
    * };
@@ -532,3 +560,4 @@
 
 </body>
 </html>
+
