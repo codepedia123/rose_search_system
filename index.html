@@ -35,17 +35,16 @@
 
     /* Filter Button Styles */
     .filter-scroll-container button {
-      border: 1px solid black;   /* black outline */
+      border: 1px solid black;
       padding: 8px 14px;
       border-radius: 20px;
       font-size: 14px;
-      font-weight: normal;       /* normal font weight */
+      font-weight: normal;
       cursor: pointer;
-      background-color: white;   /* white background */
-      color: black;              /* black text */
+      background-color: white;
+      color: black;
       white-space: nowrap;
     }
-
     .filter-scroll-container button:hover {
       background-color: #eaeaea;
     }
@@ -249,20 +248,21 @@
 
 <div class="slider">
   <div class="slides" id="slides">
-    <!-- Translated slides will be dynamically added here by JavaScript -->
+    <!-- Slides will be dynamically added by JavaScript -->
   </div>
 </div>
 
+<!-- POPUP OVERLAY -->
 <div class="popup-overlay" id="popupOverlay">
   <div class="popup" id="popup">
-    <!-- Close button -->
+    <!-- Close Button -->
     <span class="close-btn" onclick="closePopup()">×</span>
-    <!-- Star button (save) -->
+    <!-- Star (Save) Button -->
     <img 
       id="starButton" 
       class="star-button" 
-      src="https://res.cloudinary.com/di751ehfz/image/upload/v1739370280/star_bxmhkq.png"
-      onclick="toggleSaved()"
+      src="https://res.cloudinary.com/di751ehfz/image/upload/v1739370280/star_bxmhkq.png" 
+      onclick="toggleSaved()" 
     />
 
     <h2 id="popupTitle">Workshop Title</h2>
@@ -270,11 +270,11 @@
     <p><span class="icon icon-dyslexia"></span><span id="popupTopic">SEN NAME</span></p>
     <p><span class="icon icon-clock"></span><span id="popupTime">Date & Time</span></p>
     <p><span class="icon icon-location"></span><span id="popupLocation">Location</span></p>
-    <!-- Description only in popup -->
+    <!-- Description ONLY in popup -->
     <p class="description" id="popupDescription"></p>
 
     <div class="price-tag" id="popupPrice">$200</div>
-    <!-- Extra Buttons for Popup -->
+    <!-- Extra Buttons inside popup -->
     <a href="#" class="button view-org" onclick="postMessage('View Organisation')">View Organisation</a>
     <a href="#" class="button view-website" onclick="postMessage('View Website')">View Website</a>
   </div>
@@ -283,14 +283,14 @@
 <script>
   const slidesContainer = document.getElementById('slides');
   let targetLang = 'en';               // Default language
-  let slideDataOriginal = [];          // Original data (unfiltered, untranslated)
-  let translatedDataOriginal = [];     // Translated data (parallel structure)
-  let slideData = [];                  // Currently displayed data (after filters)
-  let translatedData = [];             // Currently displayed translated data (after filters)
+  let slideDataOriginal = [];          // Original data (unfiltered)
+  let translatedDataOriginal = [];     // Translated data in parallel
+  let slideData = [];                  // Currently displayed data after filters
+  let translatedData = [];             // Parallel array for displayed translations
 
-  let activeFilters = [];              // Track active filters/sorts
-  let savedIDs = [];                   // Track saved workshop IDs
-  let currentPopupID = null;           // ID of the workshop currently shown in popup
+  let activeFilters = [];              // Track active filter names
+  let savedIDs = [];                   // IDs that are currently saved
+  let currentPopupID = null;           // The ID of the workshop in the popup
 
   // ---------------------- Utilities ---------------------- //
   // Parse date in format DD/MM/YYYY to a Date object for sorting
@@ -302,9 +302,9 @@
     return new Date(`${year}-${month}-${day}`);
   }
 
-  // Convert "DD/MM/YYYY" + "Time" into "13 January 2025 10:00 AM - 11:00 AM"
+  // Convert "DD/MM/YYYY" + "Time" => "13 February 2025 10:00 AM - 11:00 AM"
   function formatDateTime(dateStrDDMMYYYY, timeStr) {
-    if (!dateStrDDMMYYYY) return timeStr; // fallback if date is missing
+    if (!dateStrDDMMYYYY) return timeStr; // fallback
     const [day, month, year] = dateStrDDMMYYYY.split('/');
     const dayNum = Number(day);
     const monthNum = Number(month);
@@ -316,17 +316,15 @@
     ];
     const monthName = monthNames[monthNum - 1] || "Unknown";
 
-    // Final format => "13 January 2025 10:00 AM - 11:00 AM"
     return `${dayNum} ${monthName} ${yearNum} ${timeStr}`;
   }
-  // ------------------------------------------------------- //
 
-  // Translation API
+  // ---------------------- Translation API ---------------------- //
   const translationAPIUrl = "https://script.google.com/macros/s/AKfycbyOjmRSRhbTQ4HEHnR5yAb5eoNQJn2t80yvmdX03uYZzqUXqCPnZ0AjTaAEgNcleyBM/exec";
 
-  // Translate (or skip translation) then store the result in translatedDataOriginal
+  // Translate or skip if targetLang = 'en'
   function translateSlides(data) {
-    // Keep the original data array
+    // Keep the original data
     slideDataOriginal = data;
 
     if (data.length === 0) {
@@ -334,19 +332,18 @@
       return;
     }
 
-    // If no valid target language, skip
+    // If invalid target language, skip
     if (!targetLang || targetLang.trim() === '') {
       console.error("Target language is missing or invalid.");
       return;
     }
 
-    // If language is English, skip the API call
+    // If language is English, skip calling API
     if (targetLang === 'en') {
-      // Just clone the data
-      translatedDataOriginal = data.map(item => ({ ...item }));
+      translatedDataOriginal = data.map(item => ({ ...item })); // clone
       applyAllFilters();
     } else {
-      // Prepare a pipe-delimited line for each workshop so the script can return them line by line.
+      // Prepare pipe-delimited string for each workshop
       const csvData = data.map(item =>
         `${item.title}|${item.organization}|${item.topic}|${item.time}|${item.location}|${item.price}|${item.description}`
       ).join("\n");
@@ -378,15 +375,15 @@
     }
   }
 
-  // Apply all active filters in sequence to produce the final displayed data
+  // ---------------------- Filter Logic ---------------------- //
   function applyAllFilters() {
-    // Start from the "original" data sets
+    // Start with full original data
     let combined = slideDataOriginal.map((orig, i) => ({
       original: orig,
       translated: translatedDataOriginal[i]
     }));
 
-    // Apply each "filter" (really a sort) in the order they were toggled on
+    // Apply each filter in the order they are active
     activeFilters.forEach(filter => {
       if (filter === 'priceHighToLow') {
         combined.sort((a, b) => b.original.price - a.original.price);
@@ -399,38 +396,37 @@
       }
     });
 
+    // Extract final arrays after sorting
     slideData = combined.map(item => item.original);
     translatedData = combined.map(item => item.translated);
 
+    // Update on screen
     updateSlidesContent(translatedData, slideData);
   }
 
-  // Toggle a filter in/out of the activeFilters array
   function toggleFilter(filterName) {
     if (activeFilters.includes(filterName)) {
-      // Remove it if already applied
+      // Remove if already present
       activeFilters = activeFilters.filter(f => f !== filterName);
     } else {
-      // Add if not applied
+      // Add if not present
       activeFilters.push(filterName);
     }
     applyAllFilters();
   }
 
-  // Update the slides on screen
+  // ---------------------- Slide & Popup Rendering ---------------------- //
   function updateSlidesContent(tData, oData) {
-    slidesContainer.innerHTML = ""; // Clear existing slides
+    slidesContainer.innerHTML = ""; // clear
 
     tData.forEach((item, index) => {
       const slide = document.createElement("div");
       slide.className = "slide";
 
-      // Merge the original date with translated time
       const dateTimeStr = formatDateTime(oData[index].Date, item.time);
 
       slide.onclick = () => {
-        // Post the original ID to Thunkable for reference (optional)
-        ThunkableWebviewerExtension.postMessage(String(oData[index].id));
+        // Show popup
         showPopup(item, oData[index].Date, oData[index].id);
       };
 
@@ -446,9 +442,8 @@
     });
   }
 
-  // Show the popup with full detail
   function showPopup(data, dateStr, idValue) {
-    currentPopupID = idValue; // store the ID of the displayed workshop
+    currentPopupID = idValue;
     document.getElementById("popupTitle").innerText = data.title;
     document.getElementById("popupOrganization").innerText = data.organization;
     document.getElementById("popupTopic").innerText = data.topic;
@@ -457,75 +452,61 @@
     document.getElementById("popupPrice").innerText = data.price;
     document.getElementById("popupDescription").innerText = data.description;
 
-    // Update star icon according to whether it's saved
+    // Update star icon
     updateStarIcon();
 
     document.getElementById("popupOverlay").style.display = "flex";
   }
 
   function closePopup() {
-    document.getElementById("popupOverlay").style.display = "none";
     currentPopupID = null;
+    document.getElementById("popupOverlay").style.display = "none";
   }
 
-  // Send a message back to Thunkable (generic helper)
-  function postMessage(mess) {
-    ThunkableWebviewerExtension.postMessage(mess);
-  }
-
-  // Star/save functionality
-  function toggleSaved() {
-    // If current workshop is already saved, do nothing (per your requirement)
-    if (savedIDs.includes(String(currentPopupID))) {
-      return;
-    }
-    // If unsaved, send ? + workshop ID to Thunkable
-    postMessage(`?${currentPopupID}`);
-  }
-
+  // ---------------------- Saving / Star Button ---------------------- //
   function updateStarIcon() {
     const starImg = document.getElementById("starButton");
     if (!currentPopupID) return;
     if (savedIDs.includes(String(currentPopupID))) {
-      // Show saved icon
+      // Saved
       starImg.src = "https://res.cloudinary.com/di751ehfz/image/upload/v1739370280/star_1_ndcskw.png";
     } else {
-      // Show unsaved icon
+      // Unsaved
       starImg.src = "https://res.cloudinary.com/di751ehfz/image/upload/v1739370280/star_bxmhkq.png";
     }
   }
 
-  // -------------------- THUNKABLE INTEGRATION -------------------- //
+  function toggleSaved() {
+    if (!currentPopupID) return;
+    const strID = String(currentPopupID);
 
-  /**
-   * Accepts JSON in the format:
-   * {
-   *   "data": [
-   *     {
-   *       "Name": "Alpha Corp",
-   *       "OrgID": 1,
-   *       "SEN": "ASD, ADHD, Dyslexia",
-   *       "Time": "10:00 AM - 11:00 AM",
-   *       "Location": "Island",
-   *       "Price": 3653,
-   *       "Date": "13/01/2025",
-   *       "ID": 1,
-   *       "organization": "zdfgh",
-   *       "workshopID": "worksop12J134",
-   *       "Description": "Workshop details here..."
-   *     }
-   *   ]
-   * }
-   */
+    // If already saved, remove it
+    if (savedIDs.includes(strID)) {
+      savedIDs = savedIDs.filter(id => id !== strID);
+    } else {
+      // Otherwise, add it
+      savedIDs.push(strID);
+    }
+    // Update icon immediately
+    updateStarIcon();
+
+    // Send updated saved IDs list to Thunkable (prefix "?")
+    postMessage("?" + savedIDs.join(","));
+  }
+
+  // ---------------------- Thunkable Messaging ---------------------- //
+  function postMessage(mess) {
+    ThunkableWebviewerExtension.postMessage(mess);
+  }
+
   function updateSlidesFromJSON(jsonData) {
-    const dataObj = typeof jsonData === 'string' ? JSON.parse(jsonData) : jsonData;
-
+    const dataObj = (typeof jsonData === 'string') ? JSON.parse(jsonData) : jsonData;
     if (!dataObj || !Array.isArray(dataObj.data)) {
       console.error("Invalid JSON format: Expected { data: [...] }");
       return;
     }
 
-    // Map the incoming objects to the structure our code expects
+    // Map input to consistent shape
     const data = dataObj.data.map(item => ({
       id: item.ID,
       title: String(item.Name),
@@ -538,11 +519,11 @@
       description: item.Description ? String(item.Description) : ""
     }));
 
-    // Pass data to the translation process
+    // Translate or display immediately
     translateSlides(data);
   }
 
-  // Receive messages from Thunkable
+  // Listen for messages from Thunkable
   ThunkableWebviewerExtension.receiveMessage(function(message) {
     console.log("Received message:", message);
     try {
@@ -550,20 +531,18 @@
       if (message.startsWith("*")) {
         targetLang = message.slice(1);
         console.log("Language changed to:", targetLang);
-        // Re-run translation if we already have data
         if (slideDataOriginal && slideDataOriginal.length > 0) {
           translateSlides(slideDataOriginal);
         }
       }
-      // If message starts with "?" => updated list of saved IDs
+      // If message starts with "?" => saved ID list
       else if (message.startsWith("?")) {
-        // The remainder is a comma-separated list of saved IDs
         const savedStr = message.substring(1).trim();
         savedIDs = savedStr ? savedStr.split(",") : [];
-        // Update star if popup is open
+        // If a popup is open, refresh star icon
         updateStarIcon();
       }
-      // Otherwise, treat the message as our JSON data
+      // Otherwise, treat as JSON data
       else {
         updateSlidesFromJSON(message);
       }
@@ -573,8 +552,16 @@
   });
 </script>
 
-
+<!-- Optional: remove if not needed -->
+<script
+  defer
+  src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015"
+  integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ=="
+  data-cf-beacon='{"rayId":"8f4bef66ca9659e4","serverTiming":{"name":{"cfExtPri":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2024.10.5","token":"ef0548ffc9904e66b75bcd9134981ca0"}'
+  crossorigin="anonymous">
+</script>
 
 </body>
 </html>
+
 
